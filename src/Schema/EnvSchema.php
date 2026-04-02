@@ -338,7 +338,7 @@ final class EnvSchema
             type: $type,
             enum: $enumClass,
             required: (bool) ($raw['required'] ?? false),
-            notEmpty: (bool) ($raw['notEmpty'] ?? false),
+            notEmpty: (bool) ($raw['not_empty'] ?? $raw['notEmpty'] ?? false),
             default: $raw['default'] ?? null,
             description: isset($raw['description']) && is_string($raw['description']) ? $raw['description'] : null,
             separator: isset($raw['separator']) && is_string($raw['separator']) && $raw['separator'] !== '' ? $raw['separator'] : ',',
