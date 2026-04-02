@@ -362,10 +362,22 @@ final class EnvSchemaTest extends TestCase
     }
 
     #[Test]
-    public function validateConstraintsNotEmpty(): void
+    public function validateConstraintsNotEmptyCamelCase(): void
     {
         $schema = new EnvSchema([
             'KEY' => ['type' => EnvType::STRING, 'required' => true, 'notEmpty' => true],
+        ]);
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('must not be empty');
+        $schema->castValue('KEY', '   ');
+    }
+
+    #[Test]
+    public function validateConstraintsNotEmptySnakeCase(): void
+    {
+        $schema = new EnvSchema([
+            'KEY' => ['type' => EnvType::STRING, 'required' => true, 'not_empty' => true],
         ]);
 
         $this->expectException(ValidationException::class);
