@@ -22,6 +22,8 @@ use PHPdot\Env\Schema\EnvSchema;
 
 final class Env
 {
+    private static ?self $instance = null;
+
     /** @var array<string, string> */
     private readonly array $rawValues;
 
@@ -304,5 +306,58 @@ final class Env
     public function getLoadedFiles(): array
     {
         return $this->loadedFiles;
+    }
+
+    // =========================================================================
+    // Global instance — used by env() helper
+    // =========================================================================
+
+    /**
+     * Initialize the global Env instance.
+     *
+     * Called once by the kernel during boot. Uses safeCreate so missing
+     * .env files are silently skipped. Schema validates and types all values.
+     *
+     * @param string|array<string, array<string, mixed>> $schema Schema file path or inline array
+     * @param string|list<string> $paths One or more .env file paths
+     */
+    public static function init(string|array $schema, string|array $paths): void
+    {
+        self::$instance = self::safeCreate($schema, $paths);
+    }
+
+    /**
+     * Retrieve a typed environment value from the global instance.
+     *
+     * Returns the schema-validated, type-cast value. If the key is not
+     * in the schema or no instance is initialized, returns $default.
+     */
+    public static function env(string $key, mixed $default = null): mixed
+    {
+        if (self::$instance === null) {
+            return $default;
+        }
+
+        if (!self::$instance->schema->has($key)) {
+            return $default;
+        }
+
+        return self::$instance->typedValues[$key] ?? $default;
+    }
+
+    /**
+     * Get the global instance, or null if not initialized.
+     */
+    public static function getInstance(): ?self
+    {
+        return self::$instance;
+    }
+
+    /**
+     * Reset the global instance. Used in testing.
+     */
+    public static function resetInstance(): void
+    {
+        self::$instance = null;
     }
 }
