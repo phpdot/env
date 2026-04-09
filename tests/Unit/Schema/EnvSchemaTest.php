@@ -40,6 +40,15 @@ final class EnvSchemaTest extends TestCase
     }
 
     #[Test]
+    public function loadFromMissingFileThrowsSchemaException(): void
+    {
+        $this->expectException(SchemaException::class);
+        $this->expectExceptionMessage('Schema file not found');
+
+        new EnvSchema('/nonexistent/path/schema.php');
+    }
+
+    #[Test]
     public function hasReturnsTrueForExisting(): void
     {
         $schema = new EnvSchema(['FOO' => ['default' => 'x']]);
