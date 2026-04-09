@@ -32,6 +32,9 @@ final class EnvSchema
     public function __construct(string|array $schema)
     {
         if (is_string($schema)) {
+            if (!is_file($schema)) {
+                throw SchemaException::invalidDefinition('*', "Schema file not found: {$schema}");
+            }
             $loaded = require $schema;
             if (!is_array($loaded)) {
                 throw SchemaException::invalidDefinition('*', 'Schema file must return an array');
