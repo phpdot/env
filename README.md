@@ -12,6 +12,10 @@ Zero dependencies. Pure PHP 8.3+.
 
 ## Quick Start
 
+Two access patterns are supported — pick whichever fits your bootstrap.
+
+### Instance-based
+
 ```php
 use PHPdot\Env\Env;
 
@@ -27,42 +31,52 @@ $env->get('DB_HOST');     // string("localhost")
 $env->get('ORIGINS');     // ['http://localhost', 'https://example.com']
 ```
 
+### Global facade (recommended for app bootstrap)
+
+```php
+use PHPdot\Env\Env;
+
+// Once, at the top of your bootstrap
+Env::init(
+    schema: __DIR__ . '/env.schema.php',
+    paths: __DIR__ . '/.env',
+);
+
+// Anywhere in your app — pure array lookup
+env('APP_PORT');                // int(8080)
+env('APP_DEBUG', false);        // bool — default returned if key missing or no Env initialized
+env('APP_ENV');                 // AppEnv::PRODUCTION
+```
+
+`Env::init()` is a thin wrapper over `safeCreate()` — missing `.env` files are silently skipped, schema defaults are used. The global `env()` helper reads from the singleton.
+
 Every value is typed. Every key is validated. Every access is a pure array lookup.
 
 ---
 
 ## Architecture
 
-```
-.env file(s)
-     │
-     ▼
-┌──────────────────────┐
-│  Lexer               │  Character-by-character tokenizer
-│  Handles quotes,     │  Escapes, multiline, BOM, export
-│  comments, escapes   │
-└──────────────────────┘
-     │
-     ▼
-┌──────────────────────┐
-│  Resolver            │  ${VAR} and $VAR interpolation
-│  Circular detection  │  Cross-file references
-└──────────────────────┘
-     │
-     ▼
-┌──────────────────────┐
-│  EnvSchema           │  Type casting + constraint validation
-│  STRING, INT, FLOAT, │  Required, min/max, allowed, pattern
-│  BOOL, ENUM, LIST,   │
-│  JSON                │
-└──────────────────────┘
-     │
-     ▼
-┌──────────────────────┐
-│  Env                 │  Immutable. readonly arrays.
-│  All values eagerly  │  get() = pure array lookup.
-│  cast at boot.       │  Zero computation per request.
-└──────────────────────┘
+```mermaid
+graph TD
+    FILES[".env file(s)<br/><br/>One or more sources,<br/>loaded in order — later<br/>files override earlier ones"]
+
+    subgraph Parser
+        direction TB
+        LEX[Lexer<br/><br/>Character-by-character tokenizer.<br/>Handles quotes, escapes, multiline,<br/>BOM, export prefix, comments]
+        RES[Resolver<br/><br/>$VAR and ${VAR} interpolation,<br/>cross-file references,<br/>circular reference detection]
+        LEX --> RES
+    end
+
+    subgraph Schema
+        direction TB
+        SCH[EnvSchema<br/><br/>Type casting + constraint validation:<br/>STRING, INT, FLOAT, BOOL,<br/>ENUM, LIST, JSON.<br/>required, min/max, allowed, pattern]
+    end
+
+    ENV[Env<br/><br/>Immutable. readonly arrays.<br/>All values eagerly cast at boot.<br/>get / env helper = pure array lookup.<br/>Zero computation per request]
+
+    FILES --> Parser
+    Parser --> Schema
+    Schema --> ENV
 ```
 
 ---
@@ -255,6 +269,25 @@ $env->get('DB_PORT');  // 5432
 
 ---
 
+## Instance API
+
+Beyond `get()`, the `Env` instance exposes:
+
+| Method | Returns | Purpose |
+|---|---|---|
+| `$env->get($key)` | `mixed` (typed) | Throws `SchemaException` on unknown key |
+| `$env->has($key)` | `bool` | True if explicitly set in a `.env` file (not just defaulted) |
+| `$env->all()` | `array<string, mixed>` | All typed values, including defaults |
+| `$env->allMasked()` | `array<string, mixed>` | Same, but `sensitive` keys replaced with `***` |
+| `$env->getRaw($key)` | `string\|null` | Raw string before type cast |
+| `$env->getSchema()` | `EnvSchema` | The compiled schema |
+| `$env->getLoadedFiles()` | `list<string>` | Paths of `.env` files actually parsed |
+| `$env->compile($path)` | `void` | Write a cache file for fast worker boot |
+
+The static facade exposes a parallel surface: `Env::env($key, $default)`, `Env::getInstance()`, `Env::resetInstance()` (testing).
+
+---
+
 ## Sensitive Values
 
 ```php
@@ -278,7 +311,7 @@ $env->compile(__DIR__ . '/cache/env.php');
 // Application boot (every worker)
 $env = Env::createFromCache(
     schema: __DIR__ . '/env.schema.php',
-    cache: __DIR__ . '/cache/env.php',
+    cachePath: __DIR__ . '/cache/env.php',
 );
 ```
 
@@ -318,9 +351,17 @@ $values = Env::parseString("FOO=bar\nBAZ=\"\${FOO}/qux\"");
 
 ## Swoole Safety
 
-`Env` is immutable. `readonly` arrays. Zero mutation methods. Register as a singleton — all coroutines share the same instance safely.
+`Env` is immutable. `readonly` arrays. Zero mutation methods. Two safe patterns:
 
 ```php
+// Static facade — call Env::init() once per worker boot (recommended)
+Env::init(
+    schema: __DIR__ . '/env.schema.php',
+    paths: __DIR__ . '/.env',
+);
+// Anywhere afterwards: env('APP_KEY') — shared by every coroutine, no per-request cost.
+
+// Or register as a DI singleton if you prefer instance access
 Env::class => singleton(fn() => Env::create(
     schema: __DIR__ . '/env.schema.php',
     paths: __DIR__ . '/.env',
@@ -361,7 +402,7 @@ src/
 ## Development
 
 ```bash
-composer test        # PHPUnit (135 tests)
+composer test        # PHPUnit (147 tests)
 composer analyse     # PHPStan level 10
 composer cs-fix      # PHP-CS-Fixer
 composer check       # All three
