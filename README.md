@@ -62,17 +62,17 @@ graph TD
 
     subgraph Parser
         direction TB
-        LEX[Lexer<br/><br/>Character-by-character tokenizer.<br/>Handles quotes, escapes, multiline,<br/>BOM, export prefix, comments]
-        RES[Resolver<br/><br/>$VAR and ${VAR} interpolation,<br/>cross-file references,<br/>circular reference detection]
+        LEX["Lexer<br/><br/>Character-by-character tokenizer.<br/>Handles quotes, escapes, multiline,<br/>BOM, export prefix, comments"]
+        RES["Resolver<br/><br/>Variable interpolation,<br/>cross-file references,<br/>circular reference detection"]
         LEX --> RES
     end
 
     subgraph Schema
         direction TB
-        SCH[EnvSchema<br/><br/>Type casting + constraint validation:<br/>STRING, INT, FLOAT, BOOL,<br/>ENUM, LIST, JSON.<br/>required, min/max, allowed, pattern]
+        SCH["EnvSchema<br/><br/>Type casting + constraint validation:<br/>STRING, INT, FLOAT, BOOL,<br/>ENUM, LIST, JSON.<br/>required, min/max, allowed, pattern"]
     end
 
-    ENV[Env<br/><br/>Immutable. readonly arrays.<br/>All values eagerly cast at boot.<br/>get / env helper = pure array lookup.<br/>Zero computation per request]
+    ENV["Env<br/><br/>Immutable. readonly arrays.<br/>All values eagerly cast at boot.<br/>get / env helper = pure array lookup.<br/>Zero computation per request"]
 
     FILES --> Parser
     Parser --> Schema
